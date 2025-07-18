@@ -2,22 +2,32 @@
 <html lang="fi">
 <head>
     <meta charset="UTF-8">
-    <title>Algebra Laskin (3D-graafilla Korjattu)</title>
-    <!-- Ladataan tarvittavat kirjastot: Math.js, function-plot (2D) ja Three.js (3D) -->
+    <title>Algebra Laskin (Lopullinen ja Vakaa Versio)</title>
+    <!-- Ladataan tarvittavat kirjastot -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.1/math.js"></script>
     <script src="https://unpkg.com/function-plot/dist/function-plot.js"></script>
-    <script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.164.1/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.164.1/examples/jsm/" } }</script>
+    <script type="importmap">{ 
+        "imports": { 
+            "three": "https://unpkg.com/three@0.164.1/build/three.module.js", 
+            "three/addons/": "https://unpkg.com/three@0.164.1/examples/jsm/" 
+        } 
+    }</script>
     
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 700px; margin: auto; padding: 20px; background-color: #f7f9fc; color: #333; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; background-color: #f7f9fc; color: #333; }
         h2, h3, h4 { color: #2c3e50; border-bottom: 2px solid #e0e0e0; padding-bottom: 5px; }
         .input-container { display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
         .equation-side { width: 42%; padding: 10px; font-size: 1.2em; border: 1px solid #ccc; border-radius: 5px; text-align: center; }
         .equals-sign { font-size: 1.8em; font-weight: bold; margin: 0 15px; }
-        .button-container { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px; }
-        button { background-color: #007bff; color: white; border: none; padding: 12px 15px; border-radius: 5px; font-size: 1.1em; cursor: pointer; transition: background-color 0.2s; }
+        .button-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 10px; }
+        button { background-color: #007bff; color: white; border: none; padding: 12px 15px; border-radius: 5px; font-size: 1em; cursor: pointer; transition: background-color 0.2s; }
         button:hover { filter: brightness(90%); }
-        #start-button { grid-column: 1 / -1; }
+        button:disabled { background-color: #a7cffa; cursor: not-allowed; }
+        #start-button { grid-column: 1 / -1; background-color: #0056b3; }
+        .function-lib-button { background-color: #5a6268; }
+        #binomial-button { background-color: #17a2b8; }
+        #general-graph-button { background-color: #ffc107; color: #212529; line-height: 1.2; padding: 8px 15px; }
+        #general-graph-button small { font-weight: normal; }
         #undo-button { background-color: #6c757d; }
         #quadratic-solver-button { background-color: #28a745; }
         #reset-button { background-color: #dc3545; }
@@ -30,60 +40,205 @@
         .info-box { background-color: #e9ecef; border: 1px solid #ced4da; padding: 15px; margin-top: 15px; border-radius: 5px; }
         .info-box code, .formula { background-color: #fff; padding: 3px 6px; border-radius: 4px; font-family: 'Courier New', monospace; }
         #quadratic-result { font-size: 1.2em; font-weight: bold; color: #155724; }
-        .graph-container { border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: #fff; min-height: 400px; }
+        .graph-container { position: relative; border: 1px solid #ddd; border-radius: 5px; padding: 10px; background: #fff; min-height: 400px; overflow: hidden;}
         .graph-container canvas { display: block; width: 100% !important; height: auto !important; }
+        .axis-label { color: #333; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: bold; background-color: rgba(255, 255, 255, 0.7); padding: 2px 8px; border-radius: 4px; pointer-events: none; }
+        #modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; display: none; }
+        #function-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 8px; z-index: 101; width: 90%; max-width: 500px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); display: none; }
+        #modal-title { margin-top: 0; }
+        #modal-list { list-style: none; padding: 0; max-height: 60vh; overflow-y: auto; }
+        #modal-list li { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
+        #modal-list li:hover { background: #f0f0f0; }
+        #modal-list li code { font-size: 1.1em; }
     </style>
 </head>
 <body>
-    <h2>Algebra Laskin</h2>
-    <div class="input-container"> <input type="text" id="left-side" class="equation-side" placeholder="x^2"> <span class="equals-sign">=</span> <input type="text" id="right-side" class="equation-side" placeholder="0"> </div>
-    <div class="button-container"> <button id="start-button" onclick="startSolving()">Aloita ratkaisu</button> <button id="undo-button" onclick="undoLastStep()" style="display: none;">Peruuta</button> <button id="quadratic-solver-button" onclick="solveQuadratic()" style="display: none;">Ratkaise 2. asteen yhtälö</button> <button id="reset-button" onclick="resetCalculator()" style="display: none;">Aloita uusi</button> </div>
-    <div id="modification-area" style="display: none;"> <h3>Vaiheet:</h3> <div id="steps" class="steps"></div> <div id="result-area"></div> <div id="graph-area"></div> <label for="modification-input" style="display: block; margin-top: 20px;">Tee muutos ja paina Enter:</label> <input type="text" id="modification-input" onkeyup="handleModificationInput(event)"> </div>
+    <h2>Algebra Laskin (Lopullinen ja Vakaa Versio)</h2>
+    <div class="input-container"> <input type="text" id="left-side" class="equation-side" placeholder="x^2-4"> <span class="equals-sign">=</span> <input type="text" id="right-side" class="equation-side" placeholder="0"> </div>
+    <div class="button-container"> 
+        <button id="start-button" onclick="startSolving()">Aloita ratkaisu</button> 
+        <button id="undo-button" onclick="undoLastStep()" style="display: none;">Peruuta</button> 
+        <button id="quadratic-solver-button" onclick="solveQuadratic()" style="display: none;">Ratkaise 2. asteen yhtälö</button> 
+        <button id="general-graph-button" onclick="drawGeneralGraph()" style="display: none;">Näytä graafi<br><small>f(x)=y</small></button>
+        <button id="binomial-button" onclick="applyBinomialRules()" style="display: none;">Kehitä/sievennä kaava</button>
+        <button id="reset-button" onclick="resetCalculator()" style="display: none;">Aloita uusi</button> 
+    </div>
+    <h4>Funktiokirjastot</h4>
+    <div class="button-container">
+        <button class="function-lib-button" onclick="showFunctionModal('algebra')">Algebra</button>
+        <button class="function-lib-button" onclick="showFunctionModal('geometry')">Geometria</button>
+        <button class="function-lib-button" onclick="showFunctionModal('trigonometry')">Trigonometria</button>
+        <button class="function-lib-button" onclick="showFunctionModal('mechanics')">Mekaniikka</button>
+    </div>
+
+    <div id="modification-area" style="display: none;"> <h3>Vaiheet:</h3> <div id="steps" class="steps"></div> <div id="result-area"></div> <div id="graph-area"></div> <label for="modification-input" style="display: block; margin-top: 20px;">Tee muutos ja paina Enter (esim. `+ 5` tai `/ 2`):</label> <input type="text" id="modification-input" onkeyup="handleModificationInput(event)"> </div>
+
+    <div id="modal-backdrop" onclick="closeFunctionModal()"></div>
+    <div id="function-modal">
+        <h3 id="modal-title"></h3>
+        <ul id="modal-list"></ul>
+    </div>
 
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
         
         let history = [];
         let animationFrameId = null; 
         const ui = {
-            steps: document.getElementById('steps'), modInput: document.getElementById('modification-input'), result: document.getElementById('result-area'), graphs: document.getElementById('graph-area'), modArea: document.getElementById('modification-area'), startButton: document.getElementById('start-button'), undoButton: document.getElementById('undo-button'), solverButton: document.getElementById('quadratic-solver-button'), resetButton: document.getElementById('reset-button')
+            steps: document.getElementById('steps'), modInput: document.getElementById('modification-input'), result: document.getElementById('result-area'), graphs: document.getElementById('graph-area'), modArea: document.getElementById('modification-area'), startButton: document.getElementById('start-button'), undoButton: document.getElementById('undo-button'), solverButton: document.getElementById('quadratic-solver-button'), resetButton: document.getElementById('reset-button'), generalGraphButton: document.getElementById('general-graph-button'), binomialButton: document.getElementById('binomial-button')
         };
         const OPERATOR_FUNCTIONS = { '+': 'add', '-': 'subtract', '*': 'multiply', '/': 'divide', '^': 'pow' };
 
-        function solveQuadratic() {
+        const functionLibraries = {
+            algebra: [ { name: "Paraabeli", value: "a*x^2 + b*x + c" }, { name: "Kuutiofunktio", value: "a*x^3 + b*x^2 + c*x + d" }, { name: "Neliöjuuri", value: "sqrt(x)" }, { name: "Eksponentti", value: "e^x" }, { name: "Luonnollinen logaritmi", value: "log(x)" } ],
+            geometry: [ { name: "Ympyrän ala", value: "pi * r^2" }, { name: "Pallon tilavuus", value: "4/3 * pi * r^3" }, { name: "Pythagoraan lause", value: "a^2 + b^2 = c^2" }, { name: "Lieriön tilavuus", value: "pi * r^2 * h" } ],
+            trigonometry: [ { name: "Sini", value: "sin(x)" }, { name: "Kosini", value: "cos(x)" }, { name: "Tangentti", value: "tan(x)" }, { name: "Trig. perusidentiteetti", value: "sin(x)^2 + cos(x)^2 = 1" } ],
+            mechanics: [ { name: "Paikka (tasainen kiihtyvyys)", value: "x0 + v0*t + 0.5*a*t^2" }, { name: "Voima (Newton II)", value: "m * a" }, { name: "Liike-energia", value: "0.5 * m * v^2" }, { name: "Potentiaalienergia", value: "m * g * h" } ]
+        };
+        
+        const expansionRules = [
+            { l: '(n1+n2)^2', r: 'n1^2+2*n1*n2+n2^2' }, { l: '(n1-n2)^2', r: 'n1^2-2*n1*n2+n2^2' },
+            { l: '(n1-n2)*(n1+n2)', r: 'n1^2-n2^2' }, { l: '(n1+n2)^3', r: 'n1^3+3*n1^2*n2+3*n1*n2^2+n2^3'},
+            { l: '(n1-n2)^3', r: 'n1^3-3*n1^2*n2+3*n1*n2^2-n2^3'}
+        ];
+        const factoringRules = expansionRules.map(rule => ({ l: rule.r, r: rule.l }));
+        factoringRules.push({ l: 'n1^2+n2^2+2*n1*n2', r:'(n1+n2)^2' });
+        factoringRules.push({ l: 'n1^2+n2^2-2*n1*n2', r:'(n1-n2)^2' });
+        
+        const termwiseDivisionRules = [
+            { l: '(n1 + n2) / n3', r: 'n1/n3 + n2/n3' }, { l: '(n1 - n2) / n3', r: 'n1/n3 - n2/n3' }
+        ];
+
+        function simplifyFully(node) {
+            const specialSimplified = math.simplify(node, termwiseDivisionRules);
+            return math.simplify(specialSimplified);
+        }
+
+        function isTrulyQuadratic(node, variable) {
+            try {
+                let d3 = math.derivative(node, variable);
+                d3 = math.derivative(d3, variable);
+                d3 = math.derivative(d3, variable);
+                return math.simplify(d3).equals(math.parse('0'));
+            } catch (e) {
+                return false;
+            }
+        }
+
+        window.showFunctionModal = (libraryName) => {
+            const library = functionLibraries[libraryName];
+            document.getElementById('modal-title').innerText = libraryName.charAt(0).toUpperCase() + libraryName.slice(1);
+            const list = document.getElementById('modal-list');
+            list.innerHTML = '';
+            library.forEach(item => {
+                const li = document.createElement('li');
+                li.innerHTML = `${item.name}: <code>${item.value}</code>`;
+                li.onclick = () => {
+                    const leftInput = document.getElementById('left-side');
+                    const rightInput = document.getElementById('right-side');
+                    const equation = item.value.split('=');
+                    leftInput.value = equation[0].trim();
+                    rightInput.value = equation.length > 1 ? equation[1].trim() : "0";
+                    closeFunctionModal();
+                };
+                list.appendChild(li);
+            });
+            document.getElementById('modal-backdrop').style.display = 'block';
+            document.getElementById('function-modal').style.display = 'block';
+        };
+        window.closeFunctionModal = () => {
+            document.getElementById('modal-backdrop').style.display = 'none';
+            document.getElementById('function-modal').style.display = 'none';
+        };
+        
+        window.applyBinomialRules = () => {
+            const current = history[history.length - 1];
+            try {
+                let simplifiedLeft, simplifiedRight;
+                const originalLeft = current.left;
+                const originalRight = current.right;
+                simplifiedLeft = math.simplify(originalLeft, expansionRules);
+                simplifiedRight = math.simplify(originalRight, expansionRules);
+                if (simplifiedLeft.equals(originalLeft) && simplifiedRight.equals(originalRight)) {
+                    simplifiedLeft = math.simplify(originalLeft, factoringRules);
+                    simplifiedRight = math.simplify(originalRight, factoringRules);
+                }
+                if (simplifiedLeft.equals(originalLeft) && simplifiedRight.equals(originalRight)) {
+                     alert("Kaavoja ei voitu soveltaa.");
+                     return;
+                }
+                history.push({ left: simplifiedLeft, right: simplifiedRight });
+                redrawSteps();
+            } catch (e) {
+                alert("Kaavan soveltaminen epäonnistui: " + e.message);
+                console.error(e);
+            }
+        };
+        
+        window.drawGeneralGraph = () => {
+            clearAllResults();
+            try {
+                const current = history[history.length - 1];
+                let fnString = current.left.toString() + " - (" + current.right.toString() + ")";
+                const plotFnString = fnString.replace(/\be\b/g, 'E');
+
+                ui.graphs.innerHTML = `<div class="info-box"><h4>Yleinen 2D-kuvaaja</h4><p>Funktio: <code>f(x) = ${fnString}</code></p><div id="general-plot-2d" class="graph-container"></div></div>` + 
+                                      `<div class="info-box"><h4>Yleinen 3D-visualisointi</h4><p>Akselit: X=Re(z), Z=Im(z), Y=Re(f(z))</p><div id="general-plot-3d" class="graph-container"></div></div>`;
+                setTimeout(() => {
+                    const plotContainer2D = document.getElementById('general-plot-2d');
+                    if (!plotContainer2D) return;
+                    functionPlot({
+                        target: '#general-plot-2d', width: plotContainer2D.clientWidth, height: 400, grid: true,
+                        xAxis: { label: 'x' }, yAxis: { label: 'y' }, 
+                        data: [{ fn: plotFnString }]
+                    });
+                    drawGeneral3DGraph_ThreeJS(fnString);
+                }, 0);
+            } catch(e) {
+                alert("Kuvaajan piirto epäonnistui: " + e.message);
+            }
+        };
+
+        // --- KORJATTU FUNKTIO ---
+        window.solveQuadratic = () => {
             if (animationFrameId) cancelAnimationFrame(animationFrameId); 
             clearAllResults();
             const currentStep = history[history.length - 1];
             if (currentStep.right.toString() !== '0') { alert("Varmista, että yhtälö on muodossa '... = 0'."); return; }
+
             try {
                 const poly = currentStep.left;
                 const { a, b, c } = getCoefficients(poly, 'x');
 
-                if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) {
-                    alert("Yhtälöä ei voitu muuttaa toisen asteen polynomiksi. Varmista, että se on muotoa ax²+bx+c ja yritä uudelleen.");
+                // Varmistetaan, että kyseessä on aito toisen asteen yhtälö
+                if (a === 0) {
+                    alert("Tämä ei ole toisen asteen yhtälö. Käytä ohjelmaa normaalin yhtälönratkaisun tapaan.");
                     return;
                 }
-                
-                if (a === 0) { alert("Tämä ei ole toisen asteen yhtälö (a=0)."); return; }
 
-                const discriminant = b * b - 4 * a * c;
-                const x1 = math.divide(math.add(-b, math.sqrt(discriminant)), 2 * a);
-                const x2 = math.divide(math.subtract(-b, math.sqrt(discriminant)), 2 * a);
+                const D = b * b - 4 * a * c;
+                const x1 = math.divide(math.add(-b, math.sqrt(D)), 2 * a);
+                const x2 = math.divide(math.subtract(-b, math.sqrt(D)), 2 * a);
                 
-                displayResults(poly, {a, b, c}, discriminant, x1, x2);
-                setupGraphContainers(discriminant < 0);
-                draw2DGraphs(poly.toString(), discriminant >= 0 ? [x1, x2] : [], discriminant < 0 ? [x1, x2] : []);
-                draw3DGraph_ThreeJS({a, b, c});
+                displayResults(poly, {a, b, c}, D, x1, x2);
+                setupGraphContainers(D < 0);
+                draw2DGraphs(poly.toString(), D >= 0 ? [x1, x2] : [], D < 0 ? [x1, x2] : []);
+                drawQuadratic3DGraph_ThreeJS({a, b, c});
 
-            } catch (e) { alert("Tunnistusvirhe: " + e.message); console.error(e); }
+            } catch (e) { 
+                alert("Ratkaisuvirhe: " + e.message); 
+                console.error(e);
+            }
         }
 
+        // --- KORJATTU FUNKTIO ---
         function displayResults(poly, coeffs, D, x1, x2) {
             const {a, b, c} = coeffs;
-            let resultHTML = `<div class="info-box"><h4>Toisen asteen yhtälön ratkaisu</h4>` +
-                             `<p>Yhtälö: <code>${poly.toString()} = 0</code> | Kertoimet: <code>a=${a}, b=${b}, c=${c}</code></p>` +
-                             `<hr><p><b>Diskriminantti D = b² - 4ac:</b> <span class="formula">(${b})² - 4*(${a})*(${c}) = ${D}</span></p><hr>`;
+            let resultHTML = `<div class="info-box"><h4>Toisen asteen yhtälön ratkaisu</h4><p>Yhtälö: <code>${poly.toString()} = 0</code> | Kertoimet: <code>a=${a}, b=${b}, c=${c}</code></p><hr>`;
+            resultHTML += `<p><b>Diskriminantti D = b² - 4ac:</b> <span class="formula">(${b})² - 4*(${a})*(${c}) = ${D}</span></p><hr>`;
+            
             if (D < 0) {
                 resultHTML += `<p id="quadratic-result">Yhtälöllä on kaksi kompleksista liittolukuratkaisua:<br><b>x₁ = ${x1.toString()}</b><br><b>x₂ = ${x2.toString()}</b></p>`;
             } else {
@@ -91,21 +246,26 @@
             }
             ui.result.innerHTML = resultHTML + `</div>`;
         }
+
+
         function setupGraphContainers(hasComplexRoots) {
             let html = `<div class="info-box"><h4>Funktion kuvaaja (reaalitaso)</h4><div id="plot-real" class="graph-container"></div></div>`;
-            if (hasComplexRoots) {
-                html += `<div class="info-box"><h4>Kompleksisten juurien sijainti (Argandin diagrammi)</h4><div id="plot-argand" class="graph-container"></div></div>`;
-            }
-            // *** SELITETEKSTI KORJATTU TÄSSÄ ***
+            if (hasComplexRoots) { html += `<div class="info-box"><h4>Kompleksisten juurien sijainti (Argandin diagrammi)</h4><div id="plot-argand" class="graph-container"></div></div>`; }
             html += `<div class="info-box"><h4>3D-visualisointi kompleksitasossa</h4><p>Akselit: X=Re(z), Z=Im(z), Y=Re(f(z)).</p><div id="plot-3d" class="graph-container"></div></div>`;
             ui.graphs.innerHTML = html;
         }
-        function draw2DGraphs(fn, realRoots, complexRoots) {
+        
+        function draw2DGraphs(fnString, realRoots, complexRoots) {
             setTimeout(() => {
                 const realPlotContainer = document.getElementById('plot-real');
                 if (!realPlotContainer) return;
-                functionPlot({ target: '#plot-real', width: realPlotContainer.clientWidth, height: 350, grid: true, data: [{ fn }, { points: realRoots.map(r => [r.re, 0]), fnType: 'points', graphType: 'scatter' }] });
-                if (complexRoots.length > 0) {
+                const plotFnString = fnString.replace(/\be\b/g, 'E');
+                functionPlot({ 
+                    target: '#plot-real', width: realPlotContainer.clientWidth, height: 350, grid: true, 
+                    xAxis: { label: 'x' }, yAxis: { label: 'y' },
+                    data: [{ fn: plotFnString }, { points: realRoots.map(r => [r.re, 0]), fnType: 'points', graphType: 'scatter' }] 
+                });
+                if (complexRoots && complexRoots.length > 0) {
                     const argandPlotContainer = document.getElementById('plot-argand');
                     if (!argandPlotContainer) return;
                     functionPlot({ target: '#plot-argand', width: argandPlotContainer.clientWidth, height: 300, grid: true, xAxis: { label: 'Reaaliosa' }, yAxis: { label: 'Imaginaariosa' }, data: [{ points: complexRoots.map(r => [r.re, r.im]), fnType: 'points', graphType: 'scatter' }] });
@@ -113,69 +273,162 @@
             }, 0);
         }
 
-        function draw3DGraph_ThreeJS(coeffs) {
-            setTimeout(() => {
-                const container = document.getElementById('plot-3d');
-                if (!container || container.clientWidth === 0) { return; }
+        function drawQuadratic3DGraph_ThreeJS(coeffs) {
+            const evaluationFn = (z_input) => math.add(math.add(math.multiply(coeffs.a, math.pow(z_input, 2)), math.multiply(coeffs.b, z_input)), coeffs.c);
+            render3DScene('plot-3d', evaluationFn);
+        }
 
+        function drawGeneral3DGraph_ThreeJS(fnString) {
+            try {
+                const fnNode = math.parse(fnString);
+                const compiledFn = fnNode.compile();
+                const evaluationFn = (z_input) => compiledFn.evaluate({ 
+                    x: z_input, e: math.e, pi: math.pi, a: 1, b: 1, c: 1, d: 1, m: 1 
+                });
+                render3DScene('general-plot-3d', evaluationFn);
+            } catch (e) {
+                console.error("Yleisen 3D-graafin luonti epäonnistui:", e);
+                const container = document.getElementById('general-plot-3d');
+                if(container) container.innerHTML = "<p>3D-graafin luonti epäonnistui.</p>";
+            }
+        }
+        
+        function render3DScene(containerId, evaluationFunction) {
+            setTimeout(() => {
+                const container = document.getElementById(containerId);
+                if (!container || container.clientWidth === 0) { return; }
+                container.innerHTML = ''; 
                 const scene = new THREE.Scene();
                 const camera = new THREE.PerspectiveCamera(75, container.clientWidth / 400, 0.1, 1000);
                 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
                 renderer.setSize(container.clientWidth, 400);
-                container.innerHTML = '';
                 container.appendChild(renderer.domElement);
-                
+                const labelRenderer = new CSS2DRenderer();
+                labelRenderer.setSize(container.clientWidth, 400);
+                labelRenderer.domElement.style.position = 'absolute';
+                labelRenderer.domElement.style.top = '0px';
+                labelRenderer.domElement.style.pointerEvents = 'none';
+                container.appendChild(labelRenderer.domElement);
                 const controls = new OrbitControls(camera, renderer.domElement);
                 scene.add(new THREE.AmbientLight(0xffffff, 0.7));
                 const light = new THREE.DirectionalLight(0xffffff, 0.8);
                 light.position.set(10, 20, 5);
                 scene.add(light);
-
                 const range = 5; 
                 const segments = 80;
                 const geometry = new THREE.PlaneGeometry(range * 2, range * 2, segments, segments);
                 geometry.rotateX(-Math.PI / 2);
-
                 const positions = geometry.attributes.position;
                 const yClamp = 15;
                 for (let i = 0; i < positions.count; i++) {
                     const x = positions.getX(i), z = positions.getZ(i);
                     const z_input = math.complex(x, z);
-                    const z_output = math.add(math.add(math.multiply(coeffs.a, math.pow(z_input, 2)), math.multiply(coeffs.b, z_input)), coeffs.c);
-                    
-                    // *** KORJATTU LASKENTA TÄSSÄ ***
-                    let y = z_output.re; // Käytetään reaaliosaa, ei itseisarvoa
-                    
+                    const z_output = evaluationFunction(z_input);
+                    let y = z_output.re;
                     y = !Number.isFinite(y) ? 0 : Math.max(-yClamp, Math.min(y, yClamp)); 
                     positions.setY(i, y);
                 }
                 positions.needsUpdate = true;
                 geometry.computeVertexNormals();
                 scene.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0x2196F3, side: THREE.DoubleSide })));
-                
-                scene.add(new THREE.GridHelper(range * 2, range * 2));
+                const grid = new THREE.GridHelper(range * 2, range * 2);
+                grid.material.transparent = true;
+                grid.material.opacity = 0.3;
+                scene.add(grid);
+                const addAxisLabel = (text, position) => {
+                    const div = document.createElement('div');
+                    div.className = 'axis-label';
+                    div.textContent = text;
+                    const label = new CSS2DObject(div);
+                    label.position.copy(position);
+                    scene.add(label);
+                };
+                addAxisLabel('X / Re(z)', new THREE.Vector3(range + 0.5, 0, 0));
+                addAxisLabel('Z / Im(z)', new THREE.Vector3(0, 0, range + 0.5));
+                addAxisLabel('Y / Re(f(z))', new THREE.Vector3(0, range, 0));
                 camera.position.set(range * 1.2, range * 1.5, range * 1.2);
                 controls.target.set(0, 0, 0);
                 controls.update();
-
                 function animate() {
                     animationFrameId = requestAnimationFrame(animate);
                     controls.update();
                     renderer.render(scene, camera);
+                    labelRenderer.render(scene, camera);
                 }
                 animate();
             }, 0);
         }
         
-        // Globaalit apufunktiot
         function clearAllResults() { ui.result.innerHTML = ''; ui.graphs.innerHTML = ''; if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; } }
         window.getCoefficients = (node, v) => { const s = {[v]:0}; return {c:node.evaluate(s), b:math.derivative(node,v).evaluate(s), a:math.derivative(math.derivative(node,v),v).evaluate(s)/2}; };
-        window.resetCalculator = () => { clearAllResults(); history = []; ui.steps.innerHTML = ''; document.getElementById('left-side').value = ''; document.getElementById('right-side').value = ''; ui.modArea.style.display = 'none'; ui.startButton.style.display = 'block'; ui.undoButton.style.display = 'none'; ui.solverButton.style.display = 'none'; ui.resetButton.style.display = 'none'; };
-        window.startSolving = () => { clearAllResults(); const l = document.getElementById('left-side').value, r = document.getElementById('right-side').value; if (!l && !r) return; history = []; try { history.push({left: math.simplify(math.parse(l||'0')), right: math.simplify(math.parse(r||'0'))}); } catch (e) { alert("Virheellinen syöte."); return; } redrawSteps(); ui.modArea.style.display = 'block'; ui.startButton.style.display = 'none'; ui.undoButton.style.display = 'block'; ui.solverButton.style.display = 'block'; ui.resetButton.style.display = 'block'; ui.modInput.value = ''; ui.modInput.focus(); };
+        window.resetCalculator = () => { clearAllResults(); history = []; ui.steps.innerHTML = ''; ui.modArea.style.display = 'none'; ui.startButton.style.display = 'block'; ui.undoButton.style.display = 'none'; ui.solverButton.style.display = 'none'; ui.resetButton.style.display = 'none'; ui.generalGraphButton.style.display = 'none'; ui.binomialButton.style.display = 'none'; };
+
+        window.startSolving = () => { 
+            clearAllResults(); 
+            const l = document.getElementById('left-side').value, r = document.getElementById('right-side').value; 
+            if (!l && !r) return; 
+            history = []; 
+            try { 
+                const leftNode = math.parse(l || '0');
+                const rightNode = math.parse(r || '0');
+                history.push({ left: leftNode, right: rightNode });
+                
+                const combinedNode = new math.OperatorNode('-', 'subtract', [leftNode, rightNode]);
+                ui.solverButton.disabled = !isTrulyQuadratic(combinedNode, 'x');
+
+            } catch (e) { 
+                alert("Virheellinen syöte. Tarkista lauseke."); console.error(e); 
+                return; 
+            } 
+            redrawSteps(); 
+            ui.modArea.style.display = 'block'; 
+            ui.startButton.style.display = 'none'; 
+            ui.undoButton.style.display = 'block'; 
+            ui.solverButton.style.display = 'block'; 
+            ui.resetButton.style.display = 'block'; 
+            ui.generalGraphButton.style.display = 'block';
+            ui.binomialButton.style.display = 'block';
+            ui.modInput.value = ''; 
+            ui.modInput.focus(); 
+        };
+
         window.undoLastStep = () => { clearAllResults(); if (history.length > 1) { history.pop(); redrawSteps(); } };
         window.redrawSteps = () => { ui.steps.innerHTML = ''; history.forEach(s => { const el = document.createElement('div'); el.className = 'step'; el.textContent = `${s.left.toString()} = ${s.right.toString()}`; ui.steps.appendChild(el); }); ui.steps.scrollTop = ui.steps.scrollHeight; };
         window.handleModificationInput = (event) => { if (event.key === 'Enter') { clearAllResults(); applyModification(); } }
-        window.applyModification = () => { const modStr = ui.modInput.value.trim(); if (!modStr) return; const current = history[history.length - 1]; try { const opMatch = modStr.match(/^([*\/+\-^])\s*(.*)$/); const logMatch = modStr.match(/^log(?:\((.*)\))?$/i); let newLeft, newRight; if (opMatch) { const [_, op, val] = opMatch; if (!val) throw new Error("Arvo puuttuu."); newLeft = new math.OperatorNode(op, OPERATOR_FUNCTIONS[op], [current.left, math.parse(val)]); newRight = new math.OperatorNode(op, OPERATOR_FUNCTIONS[op], [current.right, math.parse(val)]); } else if (logMatch) { const base = logMatch[1] ? [math.parse(logMatch[1])] : []; newLeft = new math.FunctionNode('log', [current.left, ...base]); newRight = new math.FunctionNode('log', [current.right, ...base]); } else { throw new Error("Tuntematon operaatio."); } history.push({ left: math.simplify(newLeft), right: math.simplify(newRight) }); redrawSteps(); ui.modInput.value = ''; ui.modInput.focus(); } catch (e) { alert("Virhe: " + e.message); } };
+        
+        window.applyModification = () => { 
+            const modStr = ui.modInput.value.trim(); 
+            if (!modStr) return; 
+            const current = history[history.length - 1]; 
+            try { 
+                const opMatch = modStr.match(/^([*\/+\-^])\s*(.*)$/); 
+                const logMatch = modStr.match(/^log(?:\((.*)\))?$/i); 
+                let newLeft, newRight; 
+                if (opMatch) { 
+                    const [_, op, val] = opMatch; 
+                    if (!val) throw new Error("Arvo puuttuu."); 
+                    const valNode = math.parse(val);
+                    newLeft = new math.OperatorNode(op, OPERATOR_FUNCTIONS[op], [current.left, valNode]); 
+                    newRight = new math.OperatorNode(op, OPERATOR_FUNCTIONS[op], [current.right, valNode]);
+                } else if (logMatch) { 
+                    const base = logMatch[1] ? [math.parse(logMatch[1])] : []; 
+                    newLeft = new math.FunctionNode('log', [current.left, ...base]); 
+                    newRight = new math.FunctionNode('log', [current.right, ...base]); 
+                } else { throw new Error("Tuntematon operaatio. Käytä muotoa '+ 2' tai '/ x'."); } 
+                
+                const finalLeft = simplifyFully(newLeft);
+                const finalRight = simplifyFully(newRight);
+                history.push({ left: finalLeft, right: finalRight }); 
+                
+                const combinedNode = new math.OperatorNode('-', 'subtract', [finalLeft, finalRight]);
+                ui.solverButton.disabled = !isTrulyQuadratic(combinedNode, 'x');
+                
+                redrawSteps(); 
+                ui.modInput.value = ''; 
+                ui.modInput.focus(); 
+            } catch (e) { alert("Virheellinen muokkaus: " + e.message); } 
+        };
+        
         window.solveQuadratic = solveQuadratic;
     </script>
 </body>
